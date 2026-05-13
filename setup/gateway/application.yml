@@ -1,0 +1,64 @@
+# -----------------------------------------------------------------------------
+# REFERENCE Spring Cloud Gateway configuration (NOT used at runtime — the lab
+# uses the OpenResty implementation in nginx.conf + ratelimit.lua).
+#
+# Provided here so a reader of the paper can verify that the OpenResty
+# behaviour is functionally identical to the Spring stack described in
+# §VI.B.  Copy this file into a `src/main/resources/application.yml` of a
+# Spring Boot project that depends on
+#   org.springframework.cloud:spring-cloud-starter-gateway
+#   org.springframework.boot:spring-boot-starter-data-redis-reactive
+# and run with: java -jar gateway.jar
+# -----------------------------------------------------------------------------
+server:
+  port: 8080
+  http2:
+    enabled: true
+
+spring:
+  redis:
+    host: redis
+    port: 6379
+  cloud:
+    gateway:
+      default-filters:
+        # Per-IP bucket: 100 rpm
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 2     # 100 / 60s ≈ 1.67/s ≈ 2/s
+            redis-rate-limiter.burstCapacity: 100
+            key-resolver: "#{@ipKeyResolver}"
+        # Per-X-User-Id bucket: 100 rpm
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 2
+            redis-rate-limiter.burstCapacity: 100
+            key-resolver: "#{@userKeyResolver}"
+        # Per-X-API-KEY bucket (AX001* = 100rpm / BX001* = 70rpm / other = 50rpm)
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 2
+            redis-rate-limiter.burstCapacity: 100
+            key-resolver: "#{@apiKeyResolver}"
+      routes:
+        - id: catalogue
+          uri: http://catalogue
+          predicates: [Path=/catalogue/**, Path=/tags/**]
+        - id: user
+          uri: http://user
+          predicates: [Path=/customers/**, Path=/cards/**, Path=/addresses/**, Path=/login, Path=/register]
+        - id: carts
+          uri: http://carts
+          predicates: [Path=/cart/**]
+        - id: orders
+          uri: http://orders
+          predicates: [Path=/orders/**]
+        - id: payment
+          uri: http://payment
+          predicates: [Path=/paymentAuth/**]
+        - id: shipping
+          uri: http://shipping
+          predicates: [Path=/shipping/**]
+        - id: frontend
+          uri: http://front-end:8079
+          predicates: [Path=/**]

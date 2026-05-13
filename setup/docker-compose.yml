@@ -1,0 +1,149 @@
+# ----------------------------------------------------------------------------
+# Lab bring-up.  Replicates Section VI.B / Fig. 2 of the paper:
+#
+#     attacker  →  Apache (HTTP/2) ↘
+#                                    Spring Cloud Gateway (rate-limit) → SockShop
+#
+# This file is intentionally self-contained: it pulls the upstream SockShop
+# images from Docker Hub and runs the rate-limit gateway from a tiny Spring
+# Cloud Gateway image we ship at ./gateway/.
+#
+#   docker compose up -d
+#
+# Verify:
+#   curl -s http://localhost:8080/ | head
+#   curl -i -H 'X-API-KEY: AX001-test' http://localhost:8080/catalogue
+# ----------------------------------------------------------------------------
+version: "3.8"
+
+services:
+
+  # ------------------ Spring Cloud Gateway (rate-limiter) ------------------
+  api-gateway:
+    container_name: sockshop-gateway
+    build: ./gateway
+    ports:
+      - "8080:8080"   # HTTP/1.1
+      - "8443:8443"   # HTTPS / HTTP/2 (lab cert; clients use -insecure)
+    environment:
+      - SOCKSHOP_FRONTEND=http://front-end:8079
+      - SOCKSHOP_CATALOGUE=http://catalogue
+      - SOCKSHOP_CARTS=http://carts
+      - SOCKSHOP_ORDERS=http://orders
+      - SOCKSHOP_USER=http://user
+      - SOCKSHOP_PAYMENT=http://payment
+      - SOCKSHOP_SHIPPING=http://shipping
+    depends_on:
+      - front-end
+    networks: [sockshop-net]
+
+  # ------------------ SockShop microservices --------------------------------
+  front-end:
+    image: weaveworksdemos/front-end:0.3.12
+    container_name: sockshop-frontend
+    environment:
+      - SESSION_REDIS=true
+    hostname: front-end
+    restart: always
+    networks: [sockshop-net]
+
+  catalogue:
+    image: weaveworksdemos/catalogue:0.3.5
+    container_name: sockshop-catalogue
+    hostname: catalogue
+    restart: always
+    networks: [sockshop-net]
+    depends_on: [catalogue-db]
+
+  catalogue-db:
+    image: weaveworksdemos/catalogue-db:0.3.0
+    container_name: sockshop-catalogue-db
+    hostname: catalogue-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=fake_password
+      - MYSQL_DATABASE=socksdb
+    networks: [sockshop-net]
+
+  user:
+    image: weaveworksdemos/user:0.4.7
+    container_name: sockshop-user
+    hostname: user
+    restart: always
+    environment:
+      - MONGO_HOST=user-db:27017
+    networks: [sockshop-net]
+    depends_on: [user-db]
+
+  user-db:
+    image: weaveworksdemos/user-db:0.4.0
+    container_name: sockshop-user-db
+    hostname: user-db
+    networks: [sockshop-net]
+
+  carts:
+    image: weaveworksdemos/carts:0.4.8
+    container_name: sockshop-carts
+    hostname: carts
+    restart: always
+    environment:
+      - JAVA_OPTS=-Xms64m -Xmx128m -Djava.security.egd=file:/dev/urandom -Dspring.zipkin.enabled=false
+      - reschedule=on-node-failure
+    networks: [sockshop-net]
+    depends_on: [carts-db]
+
+  carts-db:
+    image: mongo:3.4
+    container_name: sockshop-carts-db
+    hostname: carts-db
+    networks: [sockshop-net]
+
+  orders:
+    image: weaveworksdemos/orders:0.4.7
+    container_name: sockshop-orders
+    hostname: orders
+    restart: always
+    environment:
+      - JAVA_OPTS=-Xms64m -Xmx128m -Djava.security.egd=file:/dev/urandom -Dspring.zipkin.enabled=false
+    networks: [sockshop-net]
+    depends_on: [orders-db]
+
+  orders-db:
+    image: mongo:3.4
+    container_name: sockshop-orders-db
+    hostname: orders-db
+    networks: [sockshop-net]
+
+  payment:
+    image: weaveworksdemos/payment:0.4.3
+    container_name: sockshop-payment
+    hostname: payment
+    restart: always
+    networks: [sockshop-net]
+
+  shipping:
+    image: weaveworksdemos/shipping:0.4.8
+    container_name: sockshop-shipping
+    hostname: shipping
+    restart: always
+    environment:
+      - JAVA_OPTS=-Xms64m -Xmx128m -Djava.security.egd=file:/dev/urandom -Dspring.zipkin.enabled=false
+    networks: [sockshop-net]
+    depends_on: [rabbitmq]
+
+  queue-master:
+    image: weaveworksdemos/queue-master:0.3.1
+    container_name: sockshop-queue-master
+    hostname: queue-master
+    restart: always
+    networks: [sockshop-net]
+    depends_on: [rabbitmq]
+
+  rabbitmq:
+    image: rabbitmq:3.6.8-management
+    container_name: sockshop-rabbitmq
+    hostname: rabbitmq
+    networks: [sockshop-net]
+
+networks:
+  sockshop-net:
+    driver: bridge

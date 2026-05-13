@@ -1,0 +1,128 @@
+[
+  {
+    "method": "GET",
+    "path": "/a",
+    "source": "client:http://localhost:8080/js/jquery-1.11.0.min.js",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "POST",
+    "path": "/addresses",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "POST",
+    "path": "/cards",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "DELETE",
+    "path": "/cart",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "GET",
+    "path": "/cart",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "POST",
+    "path": "/cart",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "GET",
+    "path": "/cart/update",
+    "source": "client:http://localhost:8080/js/client.js",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "GET",
+    "path": "/catalogue",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "GET",
+    "path": "/catalogue/{id}",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [
+      {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "type": "string"
+      }
+    ],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "GET",
+    "path": "/customers/{id}",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [
+      {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "type": "string"
+      }
+    ],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "GET",
+    "path": "/login",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "GET",
+    "path": "/orders",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "POST",
+    "path": "/orders",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  },
+  {
+    "method": "POST",
+    "path": "/register",
+    "source": "oas:http://localhost:8080/v3/api-docs",
+    "parameters": [],
+    "consumes": "",
+    "produces": ""
+  }
+]
