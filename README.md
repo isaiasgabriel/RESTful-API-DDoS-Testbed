@@ -48,7 +48,7 @@ dedicated lab subnet with no route to the public internet.
 | `WALKTHROUGH.md`  | **Start here** for the paper lab. Runs all 5 algorithms against `setup/` (port 8080). |
 | `MONITORING.md`   | How to capture CPU / latency / error rates and reproduce paper Tables II–IX and Fig. 3–4. |
 | `setup/README.md` | Paper gateway (Section VI.B): rate-limit buckets, `docker compose` bring-up. |
-| `gateways/*/README.md` | Per plug-in notes for Kong / NGINX (`start.sh`, port 80). |
+| `gateways/*/README.md` | Per plug-in notes for Kong / NGINX (`start.sh`, ports 8080/8443). |
 
 ## Project Layout
 
@@ -98,8 +98,8 @@ matches what you are doing; they do not share the same compose files or ports.
 | **Compose** | `setup/docker-compose.yml` | `gateways/base/` + `gateways/<name>/` via `start.sh` |
 | **Entrypoint** | `cd setup && docker compose up -d` | `cd lab && ./start.sh` |
 | **Gateway** | Custom rate-limiter in `setup/gateway/` (paper policies) | `nginx` or `kong` (select with `API_GATEWAY`) |
-| **Host ports** | `8080` (HTTP/1.1), `8443` (TLS / HTTP/2) | `80` |
-| **Health check** | `GET http://localhost:8080/health` | `GET http://localhost/healthz` |
+| **Host ports** | `8080` (HTTP/1.1), `8443` (TLS / HTTP/2) | `8080` (HTTP/1.1), `8443` (TLS / HTTP/2) |
+| **Health check** | `GET http://localhost:8080/health` | `GET http://localhost:8080/healthz` |
 | **Rate limits** | Per `X-API-KEY`, client IP, and `X-User-Id` (Table in `setup/README.md`) | Global 100 req/min per client IP |
 | **Docs** | `WALKTHROUGH.md`, `setup/README.md` | `gateways/nginx/README.md`, `gateways/kong/README.md` |
 
@@ -132,7 +132,7 @@ plug-ins can be compared and tested consistently.
 cd lab
 ./start.sh                        # default: API_GATEWAY=nginx
 API_GATEWAY=kong ./start.sh
-curl -s http://localhost/healthz
+curl -s http://localhost:8080/healthz
 ```
 
 For Kong, `REDIS_URL=redis://host:port` switches rate limiting to the Redis
@@ -156,7 +156,7 @@ Tear down (example for nginx):
 #### Add a new gateway plug-in
 
 1. Create `gateways/<name>/docker-compose.override.yml` with an `api-gateway`
-   service that listens on host `:80`.
+   service that listens on host `:8080` (HTTP) and `:8443` (TLS).
 2. Implement the common contract:
    - proxy to `front-end:8079`
    - global 100 req/min per client IP
@@ -184,7 +184,7 @@ Defaults match the Quick start below (`clients=15`, `requests=2000`,
 ## Quick start
 
 The steps below use the **paper lab** (Section VI.B, `setup/` on port **8080**).
-For the Kong/NGINX plug-in stack on port **80**, see
+For the Kong/NGINX plug-in stack on ports **8080** / **8443**, see
 [Two ways to start the lab](#two-ways-to-start-the-lab) above.
 
 ```bash

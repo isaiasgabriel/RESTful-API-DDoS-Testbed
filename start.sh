@@ -42,7 +42,12 @@ fi
 
 echo "Starting Sock Shop with API gateway: ${gateway}"
 docker compose \
+  --project-directory "${SCRIPT_DIR}" \
   -f "${BASE_COMPOSE}" \
   -f "${gateway_compose}" \
   "${extra_args[@]}" \
   up -d
+
+echo "Gateway HTTP/1.1: http://localhost:8080"
+echo "Gateway TLS/HTTP2: https://localhost:8443"
+echo "Health check: curl -s http://localhost:8080/healthz"

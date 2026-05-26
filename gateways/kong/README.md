@@ -2,11 +2,11 @@
 # Kong gateway plug-in
 
 This plug-in uses `kong:3.7.1` in DB-less declarative mode and exposes the
-Sock Shop entrypoint on host port `80`.
+Sock Shop entrypoint on host ports `8080` (HTTP/1.1) and `8443` (TLS).
 
 ## Contract compliance
 
-- Listens on `:80` and proxies all routes to `front-end:8079`.
+- Listens on `:8080` (HTTP) and `:8443` (TLS) and proxies all routes to `front-end:8079`.
 - Enforces `100 requests/minute` per client IP globally.
 - Returns `429` when the limit is exceeded (with Kong standard rate-limit headers).
 - Exposes `GET /healthz` with HTTP `200`.

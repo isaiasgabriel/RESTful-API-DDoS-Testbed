@@ -6,7 +6,8 @@ import time
 
 import httpx
 
-BASE_URL = "http://127.0.0.1"
+BASE_URL = "http://127.0.0.1:8080"
+HTTPS_BASE_URL = "https://127.0.0.1:8443"
 
 
 def _send_requests(count: int, path: str = "/") -> tuple[list[int], list[float], list[httpx.Response]]:

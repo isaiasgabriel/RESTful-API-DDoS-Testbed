@@ -6,7 +6,8 @@ services:
     container_name: sockshop-gateway
     restart: unless-stopped
     ports:
-      - "80:8000"
+      - "8080:8000"
+      - "8443:8443"
     environment:
       KONG_DATABASE: "off"
       KONG_DECLARATIVE_CONFIG: /kong.yml
@@ -15,13 +16,16 @@ services:
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_ADMIN_LISTEN: "off"
-      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+      KONG_SSL_CERT: /etc/kong/tls/cert.pem
+      KONG_SSL_CERT_KEY: /etc/kong/tls/key.pem
       KONG_RATE_LIMIT_POLICY: ${KONG_RATE_LIMIT_POLICY:-local}
       KONG_REDIS_HOST: ${KONG_REDIS_HOST:-redis}
       KONG_REDIS_PORT: ${KONG_REDIS_PORT:-6379}
       KONG_REDIS_TIMEOUT: ${KONG_REDIS_TIMEOUT:-2000}
     volumes:
       - ./gateways/kong/kong.yml:/kong.yml:ro
+      - ./gateways/tls:/etc/kong/tls:ro
     networks: [sockshop-net]
 
   redis:

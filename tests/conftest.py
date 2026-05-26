@@ -14,7 +14,7 @@ import pytest
 ROOT_DIR = Path(__file__).resolve().parents[1]
 BASE_COMPOSE = ROOT_DIR / "gateways" / "base" / "docker-compose.yml"
 RESULTS_DIR = ROOT_DIR / "tests" / "results"
-HEALTH_URL = "http://127.0.0.1/healthz"
+HEALTH_URL = "http://127.0.0.1:8080/healthz"
 
 LATENCIES_BY_TEST: dict[str, list[float]] = {}
 OUTCOME_BY_TEST: dict[str, str] = {}
@@ -35,6 +35,8 @@ def _compose_base_cmd(gateway: str) -> list[str]:
     return [
         "docker",
         "compose",
+        "--project-directory",
+        str(ROOT_DIR),
         "-f",
         str(BASE_COMPOSE),
         "-f",

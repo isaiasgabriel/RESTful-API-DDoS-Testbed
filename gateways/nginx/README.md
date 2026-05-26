@@ -1,11 +1,11 @@
 <!-- Role: Usage notes for the NGINX gateway plug-in. -->
 # NGINX gateway plug-in
 
-This plug-in uses `nginx:1.27.0-alpine` to expose Sock Shop on host port `80`.
+This plug-in uses `nginx:1.27.0-alpine` to expose Sock Shop on host ports `8080` (HTTP) and `8443` (TLS).
 
 ## Contract compliance
 
-- Listens on `:80` and proxies to `front-end:8079`.
+- Listens on `:8080` (HTTP) and `:8443` (TLS) and proxies to `front-end:8079`.
 - Enforces `100 requests/minute` per client IP using `limit_req_zone`.
 - Uses `burst=20 nodelay` to absorb short bursts.
 - Returns HTTP `429` with:

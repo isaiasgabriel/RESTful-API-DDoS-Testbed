@@ -1,4 +1,5 @@
 # Role: Declarative Kong DB-less configuration for Sock Shop gateway routing and limits.
+# Host-facing proxy: HTTP/1.1 on 8080 (maps to container :8000), TLS on 8443 (container :8443).
 _format_version: "3.0"
 _transform: true
 
@@ -25,20 +26,17 @@ services:
       - name: request-termination
         config:
           status_code: 200
-          message: "{}"
+          body: "{}"
           content_type: application/json
 
 plugins:
   - name: rate-limiting
     config:
       minute: 100
-      policy: ${KONG_RATE_LIMIT_POLICY}
+      policy: local
       limit_by: ip
       fault_tolerant: true
       hide_client_headers: false
-      redis_host: ${KONG_REDIS_HOST}
-      redis_port: ${KONG_REDIS_PORT}
-      redis_timeout: ${KONG_REDIS_TIMEOUT}
 
   - name: response-transformer
     config:
