@@ -16,6 +16,8 @@ BASE_COMPOSE = ROOT_DIR / "gateways" / "base" / "docker-compose.yml"
 RESULTS_DIR = ROOT_DIR / "tests" / "results"
 HEALTH_URL = "http://127.0.0.1:8080/healthz"
 
+from comparison_report import TEST_CASES
+
 LATENCIES_BY_TEST: dict[str, list[float]] = {}
 OUTCOME_BY_TEST: dict[str, str] = {}
 
@@ -111,8 +113,14 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     gateway = str(session.config.getoption("--gateway"))
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
+    missing = [name for name in TEST_CASES if name not in OUTCOME_BY_TEST]
+    if missing:
+        print(f"\nWarning: expected test cases not executed: {', '.join(missing)}")
+
     rows: list[dict[str, Any]] = []
-    for test_name in sorted(OUTCOME_BY_TEST):
+    for test_name in TEST_CASES:
+        if test_name not in OUTCOME_BY_TEST:
+            continue
         latencies = LATENCIES_BY_TEST.get(test_name, [])
         rows.append(
             {
@@ -125,7 +133,14 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         )
 
     report_path = RESULTS_DIR / f"{gateway}_report.json"
-    report_payload = {"gateway": gateway, "exitstatus": exitstatus, "results": rows}
+    all_passed = all(OUTCOME_BY_TEST.get(t) == "passed" for t in TEST_CASES)
+    report_payload = {
+        "gateway": gateway,
+        "exitstatus": exitstatus,
+        "all_passed": all_passed and not missing,
+        "test_cases": TEST_CASES,
+        "results": rows,
+    }
     report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
 
     header = f"{'gateway':<10} {'test':<24} {'status':<8} {'p50(ms)':>10} {'p95(ms)':>10}"

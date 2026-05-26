@@ -81,9 +81,11 @@ lab/
 │   ├── sockshop/                   Sock Shop manifests / overrides
 │   └── gateway/                    Rate-limit gateway (OpenResty / Spring Cloud equiv.)
 ├── tests/
-│   ├── conftest.py                 Pytest fixtures for gateway plug-in tests
-│   ├── test_rate_limiting.py       Rate-limit contract tests (Kong / NGINX)
-│   └── results/                    JSON reports per gateway (CI)
+│   ├── conftest.py                 Pytest fixtures (stack lifecycle + per-gateway reports)
+│   ├── test_rate_limiting.py       Gateway-agnostic contract tests (single source of truth)
+│   ├── verify_gateways.py          Run all plug-ins through the same verification pipeline
+│   ├── comparison_report.py        Build tests/results/comparison_report.json
+│   └── results/                    Per-gateway + comparison JSON (CI)
 └── results/                        CSV / JSON output of attacks & monitors
 ```
 
@@ -142,16 +144,41 @@ strategy and starts the optional Redis service:
 API_GATEWAY=kong REDIS_URL=redis://redis:6379 ./start.sh
 ```
 
-Run the plug-in contract tests (from `lab/`, with dependencies installed):
+#### Gateway equivalence verification
+
+Every plug-in is validated with the **same** `tests/test_rate_limiting.py`
+suite — no per-gateway test files and no gateway-conditional assertions.
+A gateway is valid only if it passes all five cases with identical inputs
+and thresholds.
+
+**Verify one gateway** (start → healthz → pytest → report → tear down):
 
 ```bash
+cd lab
 pip install -r requirements.txt
-pytest tests/test_rate_limiting.py --gateway nginx
-pytest tests/test_rate_limiting.py --gateway kong
+pytest tests/test_rate_limiting.py --gateway nginx -v
+# → tests/results/nginx_report.json
 ```
 
-Tear down (example for nginx):  
-`docker compose -f gateways/base/docker-compose.yml -f gateways/nginx/docker-compose.override.yml down -v`
+**Verify all plug-ins and compare** (recommended):
+
+```bash
+python3 tests/verify_gateways.py -v
+# → tests/results/{gateway}_report.json for each plug-in
+# → tests/results/comparison_report.json  (verdict: equivalent | divergent)
+```
+
+Per-gateway steps (automated inside pytest `conftest.py`):
+
+1. `API_GATEWAY=<name> ./start.sh`
+2. `GET http://localhost:8080/healthz` → 200
+3. `pytest tests/test_rate_limiting.py --gateway <name>`
+4. All of: `test_under_limit`, `test_over_limit`, `test_retry_after`,
+   `test_limit_resets`, `test_health_endpoint` must pass
+5. Write `tests/results/<name>_report.json`
+6. `docker compose … down -v`
+
+If a plug-in fails, fix its **configuration** — do not weaken or skip tests.
 
 #### Add a new gateway plug-in
 
@@ -164,6 +191,8 @@ Tear down (example for nginx):
    - `GET /healthz` returns HTTP `200`
    - forward `X-Forwarded-For` and `X-Real-IP`
 3. Start it with `API_GATEWAY=<name> ./start.sh`.
+4. Run `python3 tests/verify_gateways.py --gateways <name> -v` — it must pass
+   the full suite and appear as `"pass"` for every test in `comparison_report.json`.
 
 ## Attack launcher (interactive CLI)
 

@@ -1,4 +1,6 @@
-# Role: End-to-end gateway-agnostic rate-limiting tests for Sock Shop.
+# Role: Gateway-agnostic rate-limit contract tests (single source of truth for all plug-ins).
+# Run per gateway: pytest tests/test_rate_limiting.py --gateway kong|nginx
+# Verify all:      python3 tests/verify_gateways.py
 from __future__ import annotations
 
 import json

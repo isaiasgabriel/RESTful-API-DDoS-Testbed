@@ -183,19 +183,46 @@ Optional — Kong with Redis-backed rate limiting:
 API_GATEWAY=kong REDIS_URL=redis://redis:6379 ./start.sh
 ```
 
-### 2.4 Run the pytest suite
+### 2.4 Run the pytest suite (single source of truth)
 
-Run **one gateway at a time** (each run starts and tears down the stack):
+`tests/test_rate_limiting.py` is **gateway-agnostic**.  There are no
+per-gateway test files and no gateway-conditional assertions.  The only
+variable is `--gateway kong|nginx`.  A plug-in is valid only if it passes
+all five cases with the same inputs and thresholds.
+
+**Verify all plug-ins** (recommended — runs the full pipeline for each, then
+compares results):
 
 ```bash
 cd lab
 source .venv/bin/activate
 
-pytest tests/test_rate_limiting.py --gateway nginx -v
-pytest tests/test_rate_limiting.py --gateway kong -v
+python3 tests/verify_gateways.py -v
 ```
 
-What happens under the hood:
+This executes, **in order for each gateway**:
+
+| Step | Action |
+|------|--------|
+| a | `API_GATEWAY=<name> ./start.sh` |
+| b | Wait for `GET http://localhost:8080/healthz` → 200 |
+| c | `pytest tests/test_rate_limiting.py --gateway <name> -v` |
+| d | Require all five tests to pass |
+| e | Write `tests/results/<name>_report.json` |
+| f | `docker compose … down -v` |
+
+Then it writes `tests/results/comparison_report.json` with
+`"verdict": "equivalent"` only if every gateway passes every test with the
+same pass/fail outcome.  Any mismatch sets `"verdict": "divergent"` and lists
+the differing test names in `divergences`.
+
+**Verify one gateway** manually:
+
+```bash
+pytest tests/test_rate_limiting.py --gateway nginx -v
+```
+
+What happens under the hood (each pytest session):
 
 1. **Session fixture** (`tests/conftest.py`) calls `./start.sh` with
    `API_GATEWAY` set from `--gateway`.
@@ -205,6 +232,9 @@ What happens under the hood:
 4. Tears the stack down with `docker compose … down -v`.
 5. Prints a **summary table** (gateway, test, pass/fail, latency p50/p95)
    and writes `tests/results/{gateway}_report.json` for CI.
+
+If a gateway fails a test, **fix its configuration** — do not skip or weaken
+the test suite.
 
 Example summary (Kong):
 
@@ -217,10 +247,11 @@ kong       test_over_limit          passed         0.95       2.35
 ...
 ```
 
-Inspect the JSON report:
+Inspect the JSON reports:
 
 ```bash
 python3 -m json.tool tests/results/nginx_report.json
+python3 -m json.tool tests/results/comparison_report.json
 ```
 
 ### 2.5 Manual spot-checks (optional)
