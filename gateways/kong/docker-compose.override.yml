@@ -1,0 +1,33 @@
+# Role: Kong gateway plug-in override that fronts Sock Shop and applies global rate limiting.
+
+services:
+  api-gateway:
+    image: kong:3.7.1
+    container_name: sockshop-gateway
+    restart: unless-stopped
+    ports:
+      - "80:8000"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: "off"
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_RATE_LIMIT_POLICY: ${KONG_RATE_LIMIT_POLICY:-local}
+      KONG_REDIS_HOST: ${KONG_REDIS_HOST:-redis}
+      KONG_REDIS_PORT: ${KONG_REDIS_PORT:-6379}
+      KONG_REDIS_TIMEOUT: ${KONG_REDIS_TIMEOUT:-2000}
+    volumes:
+      - ./gateways/kong/kong.yml:/kong.yml:ro
+    networks: [sockshop-net]
+
+  redis:
+    image: redis:7.2.5-alpine
+    container_name: sockshop-gateway-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    profiles: ["redis"]
+    networks: [sockshop-net]

@@ -1,0 +1,54 @@
+# Role: Declarative Kong DB-less configuration for Sock Shop gateway routing and limits.
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: sockshop-frontend
+    url: http://front-end:8079
+    routes:
+      - name: sockshop-frontend-route
+        paths:
+          - /
+        strip_path: false
+        preserve_host: false
+
+  - name: sockshop-healthz-sink
+    url: http://127.0.0.1:65535
+    routes:
+      - name: sockshop-healthz-route
+        paths:
+          - /healthz
+        methods:
+          - GET
+        strip_path: false
+    plugins:
+      - name: request-termination
+        config:
+          status_code: 200
+          message: "{}"
+          content_type: application/json
+
+plugins:
+  - name: rate-limiting
+    config:
+      minute: 100
+      policy: ${KONG_RATE_LIMIT_POLICY}
+      limit_by: ip
+      fault_tolerant: true
+      hide_client_headers: false
+      redis_host: ${KONG_REDIS_HOST}
+      redis_port: ${KONG_REDIS_PORT}
+      redis_timeout: ${KONG_REDIS_TIMEOUT}
+
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - "Retry-After: 60"
+
+  - name: pre-function
+    config:
+      access:
+        - |
+          local ip = kong.client.get_forwarded_ip()
+          kong.service.request.set_header("X-Real-IP", ip)
