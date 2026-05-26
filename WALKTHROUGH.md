@@ -7,7 +7,19 @@ CPU exhaustion on the server**, and **(d) confirmed the rate-limiter bypass
 that the paper claims**.
 
 Time budget: ~25 minutes if you've already pulled the Docker images, ~45
-minutes for a cold start.
+minutes for a cold start.  Add ~15 minutes if you also run the
+[gateway plug-in tests](#2-gateway-plug-in-rate-limit-testing-kong--nginx)
+(Section 2).
+
+This walkthrough has **two tracks**:
+
+| Track | Stack | Use when |
+|-------|--------|----------|
+| **Paper lab** (Sections 1, 3–11) | `setup/docker-compose.yml` | Reproducing Algorithms 1–5 and the paper's rate-limit *bypass* (§VI.B) |
+| **Gateway plug-ins** (Section 2) | `gateways/` + `start.sh` | Verifying interchangeable Kong / NGINX gateways and IP-based rate limits |
+
+Both expose HTTP on **8080** and TLS on **8443** on the host.  **Do not run
+both stacks at once** — they bind the same ports.
 
 ---
 
@@ -41,10 +53,15 @@ trips the rate-limiter.
 
 ---
 
-## 1. Bring the lab up
+## 1. Bring the paper lab up (Section VI.B)
+
+This is the stack **described in the paper**: Apache-style front door → API
+gateway with three rate-limit dimensions (`X-API-KEY`, client IP,
+`X-User-Id`) → Sock Shop microservices.  Algorithms 1–5 in this walkthrough
+target **this** environment.
 
 ```bash
-cd /home/user/Desktop/ddos/lab/setup
+cd lab/setup
 docker compose up -d --build         # ~3 min cold start
 docker compose ps                    # should list 14 containers, all "Up"
 ```
@@ -83,7 +100,186 @@ This is the **defence** the gateway provides.  Algorithms 3-5 below break it.
 
 ---
 
-## 2. Algorithm 1 — Endpoint Discovery
+## 2. Gateway plug-in rate-limit testing (Kong / NGINX)
+
+This section covers the **second** lab stack: Sock Shop behind a swappable
+API gateway (Kong or NGINX) with a **single global limit** of 100 requests
+per minute per client IP.  It is **not** the paper's multi-bucket gateway;
+it exists so you can compare gateway implementations and prove they all
+honour the same [plug-in contract](README.md#two-ways-to-start-the-lab)
+without changing Sock Shop service code.
+
+### 2.1 What you are testing
+
+The automated suite in `tests/test_rate_limiting.py` checks that each
+gateway plug-in:
+
+| Requirement | How the test checks it |
+|-------------|-------------------------|
+| Listens on host **8080** (HTTP) | All HTTP traffic uses `http://127.0.0.1:8080` |
+| Enforces **100 req/min per IP** | 90 requests → no `429`; 150 requests → at least one `429` |
+| Returns **`Retry-After`** on `429` | Header present on a rate-limited response |
+| Window **resets** after ~60 s | After hitting the limit, wait 61 s, 10 more requests succeed |
+| **`GET /healthz` → 200** | Dedicated health test |
+
+TLS is exposed on host **8443** (container port 443 for NGINX, 8443 for
+Kong).  The pytest suite uses HTTP on 8080 only; you can sanity-check TLS
+manually (see below).
+
+### 2.2 Prerequisites
+
+From the repository root:
+
+```bash
+cd lab
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+You also need Docker with permission to pull `nginx:1.27.0-alpine`,
+`kong:3.7.1`, and the Weaveworks Sock Shop images (same as the paper lab).
+
+**Important:** tear down the paper lab first if it is still running — both
+stacks use ports 8080 and 8443:
+
+```bash
+cd lab/setup
+docker compose down -v
+```
+
+### 2.3 Start a gateway plug-in
+
+```bash
+cd lab
+API_GATEWAY=nginx ./start.sh          # default if API_GATEWAY is omitted
+# API_GATEWAY=kong ./start.sh         # Kong OSS, DB-less declarative mode
+```
+
+`start.sh` merges `gateways/base/docker-compose.yml` with
+`gateways/<name>/docker-compose.override.yml` and prints the active gateway.
+On success you should see:
+
+```
+Starting Sock Shop with API gateway: nginx
+Gateway HTTP/1.1: http://localhost:8080
+Gateway TLS/HTTP2: https://localhost:8443
+Health check: curl -s http://localhost:8080/healthz
+```
+
+Wait until the gateway answers (up to ~30 s on a cold start):
+
+```bash
+curl -s http://localhost:8080/healthz
+# → {}   (or empty body) with HTTP 200
+
+curl -sk https://localhost:8443/healthz
+# → {}   with HTTP 200  (self-signed cert in gateways/tls/)
+```
+
+Optional — Kong with Redis-backed rate limiting:
+
+```bash
+API_GATEWAY=kong REDIS_URL=redis://redis:6379 ./start.sh
+```
+
+### 2.4 Run the pytest suite
+
+Run **one gateway at a time** (each run starts and tears down the stack):
+
+```bash
+cd lab
+source .venv/bin/activate
+
+pytest tests/test_rate_limiting.py --gateway nginx -v
+pytest tests/test_rate_limiting.py --gateway kong -v
+```
+
+What happens under the hood:
+
+1. **Session fixture** (`tests/conftest.py`) calls `./start.sh` with
+   `API_GATEWAY` set from `--gateway`.
+2. Polls `http://127.0.0.1:8080/healthz` for up to **30 seconds**.
+3. Runs the five test cases (under-limit, over-limit, `Retry-After`, reset,
+   health).
+4. Tears the stack down with `docker compose … down -v`.
+5. Prints a **summary table** (gateway, test, pass/fail, latency p50/p95)
+   and writes `tests/results/{gateway}_report.json` for CI.
+
+Example summary (Kong):
+
+```
+Rate-limit test summary
+gateway    test                     status      p50(ms)    p95(ms)
+------------------------------------------------------------------
+kong       test_under_limit         passed         2.85       4.08
+kong       test_over_limit          passed         0.95       2.35
+...
+```
+
+Inspect the JSON report:
+
+```bash
+python3 -m json.tool tests/results/nginx_report.json
+```
+
+### 2.5 Manual spot-checks (optional)
+
+These mirror what the tests assert without waiting for the full suite
+(`test_limit_resets` sleeps **61 seconds**).
+
+**Under the IP limit** (should stay non-429):
+
+```bash
+for i in $(seq 1 90); do
+  curl -sS -o /dev/null -w "%{http_code} " http://localhost:8080/
+done; echo
+```
+
+**Over the limit** (expect at least one `429` with `Retry-After`):
+
+```bash
+for i in $(seq 1 150); do
+  curl -sS -o /dev/null -D - http://localhost:8080/ 2>/dev/null | head -1
+done | sort | uniq -c
+```
+
+NGINX returns a JSON body on 429:
+
+```json
+{"error":"rate_limit_exceeded","retry_after":60}
+```
+
+### 2.6 Tear down the plug-in stack
+
+If you started manually and pytest did not tear down:
+
+```bash
+cd lab
+docker compose \
+  --project-directory . \
+  -f gateways/base/docker-compose.yml \
+  -f gateways/nginx/docker-compose.override.yml \
+  down -v --remove-orphans
+# swap nginx → kong in the override path if needed
+```
+
+### 2.7 How this relates to the paper track
+
+| | Paper lab (`setup/`) | Gateway plug-ins (`gateways/` + `start.sh`) |
+|---|----------------------|---------------------------------------------|
+| Rate-limit model | Per `X-API-KEY` prefix, IP, and `X-User-Id` | Global 100/min per client IP only |
+| Goal of tests | Show **bypass** via header rotation (Algos 3–5) | Show gateways are **interchangeable** and enforce the contract |
+| Health endpoint | `GET /health` | `GET /healthz` |
+| Attack scripts | `algorithms/`, `attacks/` | `tests/test_rate_limiting.py` |
+
+After finishing Section 2, continue with Section 3 to run the paper's
+Algorithms 1–5 — but **bring `setup/` back up** (Section 1) and tear down
+the plug-in stack first.
+
+---
+
+## 3. Algorithm 1 — Endpoint Discovery
 
 **Goal**: enumerate every API route the target exposes, from two independent
 sources (so we catch routes that aren't documented).
@@ -98,7 +294,7 @@ sources (so we catch routes that aren't documented).
 **Run**:
 
 ```bash
-cd /home/user/Desktop/ddos/lab
+cd lab
 python3 algorithms/algorithm1_discover.py \
     --oas         http://localhost:8080/v3/api-docs \
     --client-root http://localhost:8080/ \
@@ -128,7 +324,7 @@ them.
 
 ---
 
-## 3. Algorithm 2 — Target Identification
+## 4. Algorithm 2 — Target Identification
 
 **Goal**: among the 14 endpoints discovered, find the ones that are worth
 attacking.  Two criteria:
@@ -185,7 +381,7 @@ attack target**.
 
 ---
 
-## 4. Start the target-side monitor (open in a second terminal!)
+## 5. Start the target-side monitor (open in a second terminal!)
 
 Before launching any attack, start sampling CPU and memory on the gateway
 **and** on the busiest backend container in two more terminals:
@@ -203,7 +399,7 @@ them running until the last attack finishes.
 
 ---
 
-## 5. Algorithm 3 — HTTP/1.1 Symmetric Attack
+## 6. Algorithm 3 — HTTP/1.1 Symmetric Attack
 
 **Goal**: take the *single* heaviest endpoint (`GET /orders`) and fire the
 same request at it from many parallel clients.
@@ -256,7 +452,7 @@ mirroring §VI.C.2 of the paper.
 
 ---
 
-## 6. Algorithm 4 — HTTP/1.1 Asymmetric Attack
+## 7. Algorithm 4 — HTTP/1.1 Asymmetric Attack
 
 **Goal**: same as Algorithm 3, but instead of always hitting `/orders` we
 *rotate among the entire 10-target list*, **mutating path params and query
@@ -290,7 +486,7 @@ bash attacks/algorithm4_asymmetric.sh results/targets.json 100 3
 
 ---
 
-## 7. Algorithm 5 — HTTP/2 Multiplexed Attack
+## 8. Algorithm 5 — HTTP/2 Multiplexed Attack
 
 **Goal**: same load, but riding the gateway's TLS/HTTP-2 endpoint with
 **N concurrent streams over a SINGLE TCP connection per client**.
@@ -359,7 +555,7 @@ the server — exactly the §V.D.2 prediction.
 
 ---
 
-## 8. Validating the attack worked
+## 9. Validating the attack worked
 
 Stop the monitors (Ctrl-C in their terminals) and analyse the CSVs:
 
@@ -392,7 +588,7 @@ paper's full scale (`15 × 2000`) you'll saturate the host.
 
 ---
 
-## 9. Reproducing each paper table
+## 10. Reproducing each paper table
 
 Each table in the paper is just a re-run of the same algorithm at
 different `--clients` × `--requests` settings:
@@ -422,15 +618,23 @@ This is what produces the full reproduction at paper scale.
 
 ---
 
-## 10. Cleaning up
+## 11. Cleaning up
 
 ```bash
 # stop monitors (in their terminals): Ctrl-C
 # kill any background workers we left:
 pkill -f algorithm  ||  true
-# tear the lab down:
-cd /home/user/Desktop/ddos/lab/setup
+
+# paper lab (Section 1):
+cd lab/setup
 docker compose down -v
+
+# gateway plug-in stack (Section 2), if still running:
+cd lab
+docker compose --project-directory . \
+  -f gateways/base/docker-compose.yml \
+  -f gateways/nginx/docker-compose.override.yml \
+  down -v --remove-orphans
 ```
 
 `docker compose down -v` wipes the SockShop DBs too, so a re-run starts
@@ -441,14 +645,16 @@ from a clean catalogue/orders/users state.
 ## What to do next
 
 1. **Plot the CPU CSVs** in your favourite tool to visually match Fig. 3.
-2. **Try defending**: edit `setup/gateway/ratelimit.lua` to add a fourth
+2. **Add a gateway plug-in**: follow Section 2 and `README.md` to implement
+   a third gateway, then run `pytest tests/test_rate_limiting.py --gateway <name>`.
+3. **Try defending**: edit `setup/gateway/ratelimit.lua` to add a fourth
    policy (e.g. "if the X-API-KEY has never been seen before, allow only 10
    req/min until it's verified") and re-run Algorithms 3-5.  Does the
    attack still succeed?  At what request rate?
-3. **Try HTTP/3**: the paper's §VIII calls this out as future work.  Swap
+4. **Try HTTP/3**: the paper's §VIII calls this out as future work.  Swap
    the gateway image for `apache/curl-http3` or `nghttp3` and rewrite
    Algorithm 5 with the QUIC stack.
-4. **Add anomaly detection**: tap `docker logs sockshop-gateway` into a
+5. **Add anomaly detection**: tap `docker logs sockshop-gateway` into a
    small ML classifier (one feature = "Jaccard distance between consecutive
    `X-API-KEY` values per IP") and verify the attack patterns become
    detectable.

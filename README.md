@@ -45,7 +45,7 @@ dedicated lab subnet with no route to the public internet.
 | File              | When to read it                                           |
 |-------------------|-----------------------------------------------------------|
 | `README.md`       | This file — overview, layout, [two startup paths](#two-ways-to-start-the-lab). |
-| `WALKTHROUGH.md`  | **Start here** for the paper lab. Runs all 5 algorithms against `setup/` (port 8080). |
+| `WALKTHROUGH.md`  | **Start here.** Paper lab (Algorithms 1–5, §1) + gateway plug-in pytest track (§2). |
 | `MONITORING.md`   | How to capture CPU / latency / error rates and reproduce paper Tables II–IX and Fig. 3–4. |
 | `setup/README.md` | Paper gateway (Section VI.B): rate-limit buckets, `docker compose` bring-up. |
 | `gateways/*/README.md` | Per plug-in notes for Kong / NGINX (`start.sh`, ports 8080/8443). |
