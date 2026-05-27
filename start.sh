@@ -5,6 +5,7 @@ set -euo pipefail
 # Usage:
 #   API_GATEWAY=nginx ./start.sh
 #   API_GATEWAY=kong REDIS_URL=redis://redis:6379 ./start.sh
+#   API_GATEWAY=envoy ./start.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_COMPOSE="${SCRIPT_DIR}/gateways/base/docker-compose.yml"
@@ -18,8 +19,10 @@ if [[ ! -f "${BASE_COMPOSE}" ]]; then
 fi
 
 if [[ ! -f "${gateway_compose}" ]]; then
+  supported_gateways="$(printf '%s\n' "${SCRIPT_DIR}"/gateways/*/docker-compose.override.yml \
+    | xargs -n1 dirname | xargs -n1 basename | sort | tr '\n' ',' | sed 's/,$//; s/,/, /g')"
   echo "Error: unsupported API_GATEWAY='${gateway}'." >&2
-  echo "Supported values: kong, nginx" >&2
+  echo "Supported values: ${supported_gateways}" >&2
   exit 1
 fi
 

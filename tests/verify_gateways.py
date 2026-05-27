@@ -10,10 +10,11 @@ from pathlib import Path
 TESTS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(TESTS_DIR))
 
-from comparison_report import TEST_CASES, discover_gateways, write_comparison  # noqa: E402
+from comparison_report import TEST_CASES, write_comparison  # noqa: E402
 
 ROOT_DIR = TESTS_DIR.parent
 RESULTS_DIR = TESTS_DIR / "results"
+DEFAULT_EQUIVALENCE_GATEWAYS = ["kong", "nginx"]
 
 
 def _run_pytest(gateway: str, verbose: bool) -> int:
@@ -56,7 +57,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    gateways = args.gateways or discover_gateways(ROOT_DIR / "gateways")
+    gateways = args.gateways or DEFAULT_EQUIVALENCE_GATEWAYS
     if not gateways:
         print("No gateway plug-ins found under gateways/", file=sys.stderr)
         return 1

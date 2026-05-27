@@ -48,7 +48,7 @@ dedicated lab subnet with no route to the public internet.
 | `WALKTHROUGH.md`  | **Start here.** Paper lab (Algorithms 1–5, §1) + gateway plug-in pytest track (§2). |
 | `MONITORING.md`   | How to capture CPU / latency / error rates and reproduce paper Tables II–IX and Fig. 3–4. |
 | `setup/README.md` | Paper gateway (Section VI.B): rate-limit buckets, `docker compose` bring-up. |
-| `gateways/*/README.md` | Per plug-in notes for Kong / NGINX (`start.sh`, ports 8080/8443). |
+| `gateways/*/README.md` | Per plug-in notes for Kong / NGINX / Envoy (`start.sh`, ports 8080/8443). |
 
 ## Project Layout
 
@@ -57,7 +57,8 @@ lab/
 ├── README.md                       This file
 ├── WALKTHROUGH.md                  Hands-on tutorial reproducing the paper
 ├── MONITORING.md                   CPU / latency / error-rate capture guide
-├── start.sh                        Gateway plug-in launcher (Kong / NGINX)
+├── start.sh                        Gateway plug-in launcher (Kong / NGINX / Envoy)
+├── stop.sh                         Gateway plug-in shutdown wrapper (auto-detect supported)
 ├── requirements.txt                Python dependencies
 ├── algorithms/
 │   ├── algorithm1_discover.py      Algorithm 1 – endpoint discovery
@@ -72,7 +73,8 @@ lab/
 ├── gateways/                       Swappable API gateway plug-ins (see below)
 │   ├── base/docker-compose.yml     Sock Shop core services (no gateway)
 │   ├── nginx/                      NGINX plug-in + rate-limit config
-│   └── kong/                       Kong OSS plug-in + declarative config
+│   ├── kong/                       Kong OSS plug-in + declarative config
+│   └── envoy/                      Envoy skeleton for HTTP/2 upstream experiments
 ├── monitoring/
 │   ├── monitor.sh                  CPU/mem/network sampling on the target
 │   └── monitor_client.py           Latency + error-rate sampling from attacker
@@ -96,14 +98,14 @@ matches what you are doing; they do not share the same compose files or ports.
 
 | | **Paper lab** | **Gateway plug-in stack** |
 |---|----------------|---------------------------|
-| **Purpose** | Reproduce Section VI.B and run Algorithms 1–5 | Swap Kong / NGINX (or add gateways) without changing Sock Shop code |
+| **Purpose** | Reproduce Section VI.B and run Algorithms 1–5 | Swap Kong / NGINX / Envoy (or add gateways) without changing Sock Shop code |
 | **Compose** | `setup/docker-compose.yml` | `gateways/base/` + `gateways/<name>/` via `start.sh` |
 | **Entrypoint** | `cd setup && docker compose up -d` | `cd lab && ./start.sh` |
-| **Gateway** | Custom rate-limiter in `setup/gateway/` (paper policies) | `nginx` or `kong` (select with `API_GATEWAY`) |
+| **Gateway** | Custom rate-limiter in `setup/gateway/` (paper policies) | `nginx`, `kong`, or `envoy` (select with `API_GATEWAY`) |
 | **Host ports** | `8080` (HTTP/1.1), `8443` (TLS / HTTP/2) | `8080` (HTTP/1.1), `8443` (TLS / HTTP/2) |
 | **Health check** | `GET http://localhost:8080/health` | `GET http://localhost:8080/healthz` |
 | **Rate limits** | Per `X-API-KEY`, client IP, and `X-User-Id` (Table in `setup/README.md`) | Global 100 req/min per client IP |
-| **Docs** | `WALKTHROUGH.md`, `setup/README.md` | `gateways/nginx/README.md`, `gateways/kong/README.md` |
+| **Docs** | `WALKTHROUGH.md`, `setup/README.md` | `gateways/nginx/README.md`, `gateways/kong/README.md`, `gateways/envoy/README.md` |
 
 ### 1. Paper lab (Section VI.B) — default for this repository
 
@@ -123,7 +125,7 @@ curl -i -H 'X-API-KEY: AX001-demo' http://localhost:8080/catalogue
 
 Tear down: `docker compose down -v` (from `lab/setup/`).
 
-### 2. Gateway plug-in stack (Kong / NGINX)
+### 2. Gateway plug-in stack (Kong / NGINX / Envoy)
 
 A separate compose layering path for **interchangeable** API gateways in front
 of the same Sock Shop images. It does **not** implement the paper’s
@@ -134,6 +136,7 @@ plug-ins can be compared and tested consistently.
 cd lab
 ./start.sh                        # default: API_GATEWAY=nginx
 API_GATEWAY=kong ./start.sh
+API_GATEWAY=envoy ./start.sh      # experimental HTTP/2 upstream skeleton
 curl -s http://localhost:8080/healthz
 ```
 
@@ -142,6 +145,17 @@ strategy and starts the optional Redis service:
 
 ```bash
 API_GATEWAY=kong REDIS_URL=redis://redis:6379 ./start.sh
+```
+
+Envoy is currently provided as an **experimental skeleton** for HTTP/2
+forwarding experiments; see `gateways/envoy/README.md` for caveats.
+
+Stop stacks started by `start.sh`:
+
+```bash
+./stop.sh                # auto-detect running gateway
+./stop.sh kong           # explicit gateway
+./stop.sh all            # stop all gateway stack variants
 ```
 
 #### Gateway equivalence verification
@@ -160,11 +174,11 @@ pytest tests/test_rate_limiting.py --gateway nginx -v
 # → tests/results/nginx_report.json
 ```
 
-**Verify all plug-ins and compare** (recommended):
+**Verify all contract gateways and compare** (recommended):
 
 ```bash
 python3 tests/verify_gateways.py -v
-# → tests/results/{gateway}_report.json for each plug-in
+# → tests/results/{gateway}_report.json for kong + nginx
 # → tests/results/comparison_report.json  (verdict: equivalent | divergent)
 ```
 
