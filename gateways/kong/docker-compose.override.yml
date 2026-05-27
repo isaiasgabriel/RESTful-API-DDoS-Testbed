@@ -16,7 +16,7 @@ services:
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_ADMIN_LISTEN: "off"
-      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl http2"
       KONG_SSL_CERT: /etc/kong/tls/cert.pem
       KONG_SSL_CERT_KEY: /etc/kong/tls/key.pem
       KONG_RATE_LIMIT_POLICY: ${KONG_RATE_LIMIT_POLICY:-local}

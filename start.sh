@@ -9,6 +9,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_COMPOSE="${SCRIPT_DIR}/gateways/base/docker-compose.yml"
+TLS_KEY="${SCRIPT_DIR}/gateways/tls/key.pem"
 
 gateway="${API_GATEWAY:-nginx}"
 gateway_compose="${SCRIPT_DIR}/gateways/${gateway}/docker-compose.override.yml"
@@ -24,6 +25,11 @@ if [[ ! -f "${gateway_compose}" ]]; then
   echo "Error: unsupported API_GATEWAY='${gateway}'." >&2
   echo "Supported values: ${supported_gateways}" >&2
   exit 1
+fi
+
+# Envoy runs as non-root in its container, so the mounted TLS key must be world-readable.
+if [[ -f "${TLS_KEY}" ]]; then
+  chmod 644 "${TLS_KEY}" || true
 fi
 
 extra_args=()

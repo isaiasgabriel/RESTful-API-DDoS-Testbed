@@ -10,15 +10,13 @@ without modifying Sock Shop application source code.
 - Serves `GET /healthz` with HTTP `200` on both listeners.
 - Applies a local token-bucket rate limit of `100 requests/minute`.
 - Adds `Retry-After: 60` on rate-limited responses.
-- Routes all other traffic to `front-end:8079`.
-- Tries to use **HTTP/2 upstream** via Envoy cluster protocol options.
+- Routes traffic through an internal Envoy sidecar (`frontend-h2-sidecar`).
+- Uses **HTTP/2** from edge Envoy -> sidecar, then HTTP/1.1 from sidecar -> `front-end:8079`.
 
 ## Important caveat
 
-End-to-end HTTP/2 requires the upstream service to speak h2/h2c. If the
-Sock Shop frontend only accepts HTTP/1.1, this skeleton will need adaptation
-(for example, fallback to HTTP/1.1 upstream or a dedicated h2-capable
-backend target) before it can be production-ready.
+This achieves end-to-end h2 only up to the **h2-capable upstream target/service**
+(the sidecar). Sock Shop frontend itself remains HTTP/1.1.
 
 ## Run
 

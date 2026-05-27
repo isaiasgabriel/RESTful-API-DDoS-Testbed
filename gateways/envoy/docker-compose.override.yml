@@ -1,6 +1,16 @@
 # Role: Envoy gateway plug-in override for HTTP/2 upstream forwarding experiments.
 
 services:
+  frontend-h2-sidecar:
+    image: envoyproxy/envoy:v1.30.3
+    container_name: sockshop-frontend-h2-sidecar
+    restart: unless-stopped
+    volumes:
+      - ./gateways/envoy/upstream-sidecar.yaml:/etc/envoy/envoy.yaml:ro
+    depends_on:
+      - front-end
+    networks: [sockshop-net]
+
   api-gateway:
     image: envoyproxy/envoy:v1.30.3
     container_name: sockshop-gateway
@@ -12,5 +22,5 @@ services:
       - ./gateways/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
       - ./gateways/tls:/etc/envoy/tls:ro
     depends_on:
-      - front-end
+      - frontend-h2-sidecar
     networks: [sockshop-net]

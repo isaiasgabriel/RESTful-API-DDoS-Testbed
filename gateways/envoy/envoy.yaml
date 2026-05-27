@@ -132,8 +132,8 @@ static_resources:
               - endpoint:
                   address:
                     socket_address:
-                      address: front-end
-                      port_value: 8079
+                      address: frontend-h2-sidecar
+                      port_value: 19000
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions

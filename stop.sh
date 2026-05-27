@@ -34,20 +34,43 @@ down_gateway() {
 }
 
 detect_running_gateway() {
-  local gateway
-  for gateway in $(list_gateways); do
-    local gateway_compose="${SCRIPT_DIR}/gateways/${gateway}/docker-compose.override.yml"
-    local cid
-    cid="$(docker compose \
-      --project-directory "${SCRIPT_DIR}" \
-      -f "${BASE_COMPOSE}" \
-      -f "${gateway_compose}" \
-      ps -q api-gateway 2>/dev/null || true)"
-    if [[ -n "${cid}" ]]; then
-      echo "${gateway}"
+  if ! docker ps --format '{{.Names}}' | grep -qx 'sockshop-gateway'; then
+    return 1
+  fi
+
+  local image
+  image="$(docker inspect -f '{{.Config.Image}}' sockshop-gateway 2>/dev/null || true)"
+  case "${image}" in
+    kong:*)
+      echo "kong"
       return 0
-    fi
-  done
+      ;;
+    nginx:*)
+      echo "nginx"
+      return 0
+      ;;
+    envoyproxy/envoy:*)
+      echo "envoy"
+      return 0
+      ;;
+  esac
+
+  # Fallback: infer gateway from compose config files label if available.
+  local config_files
+  config_files="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.config_files" }}' sockshop-gateway 2>/dev/null || true)"
+  if [[ "${config_files}" == *"/gateways/kong/docker-compose.override.yml"* ]]; then
+    echo "kong"
+    return 0
+  fi
+  if [[ "${config_files}" == *"/gateways/nginx/docker-compose.override.yml"* ]]; then
+    echo "nginx"
+    return 0
+  fi
+  if [[ "${config_files}" == *"/gateways/envoy/docker-compose.override.yml"* ]]; then
+    echo "envoy"
+    return 0
+  fi
+
   return 1
 }
 
