@@ -69,7 +69,9 @@ lab/
 │   ├── algorithm3_symmetric.sh     Algorithm 3 – CURL variant
 │   ├── algorithm4_asymmetric.py    Algorithm 4 – HTTP/1.1 asymmetric (httpx+mp)
 │   ├── algorithm4_asymmetric.sh    Algorithm 4 – CURL variant
-│   └── algorithm5_http2_mux.go     Algorithm 5 – HTTP/2 multiplexed attack
+│   ├── algorithm5_http2_mux.go     Algorithm 5 – original HTTP/2 multiplexed attack
+│   └── algorithm5_http2_mux_fixed.go
+│                                      Algorithm 5 – fixed standalone implementation
 ├── gateways/                       Swappable API gateway plug-ins (see below)
 │   ├── base/docker-compose.yml     Sock Shop core services (no gateway)
 │   ├── nginx/                      NGINX plug-in + rate-limit config
@@ -223,6 +225,9 @@ python3 attack_cli.py -a 5-go --clients 15 --requests 2000 --streams 200
 
 Defaults match the Quick start below (`clients=15`, `requests=2000`,
 `targets=results/targets.json`, Algorithm 5 → `https://localhost:8443`).
+The menu launcher currently invokes the original `algorithm5_http2_mux.go`;
+for the race-free fixed implementation, run
+`attacks/algorithm5_http2_mux_fixed.go` directly as shown below.
 
 ## Quick start
 
@@ -262,10 +267,10 @@ bash ../attacks/algorithm3_symmetric.sh ../results/targets.json 2000 15
 python3 ../attacks/algorithm4_asymmetric.py \
     --target ../results/targets.json --clients 15 --requests 2000
 
-# 6. Algorithm 5 – HTTP/2 multiplexed attack (Go)
+# 6. Algorithm 5 – HTTP/2 multiplexed attack (Go, fixed implementation)
 cd ../attacks
 
-go run algorithm5_http2_mux.go \
+go run algorithm5_http2_mux_fixed.go \
     -target https://localhost:8443 \
     -targets-file ../results/targets.json \
     -clients 15 \
@@ -288,11 +293,27 @@ python3 ../monitoring/monitor_client.py \
 | 2    | `algorithm2_identify.py`                             | V.B           |
 | 3    | `algorithm3_symmetric.py` / `algorithm3_symmetric.sh`| V.D           |
 | 4    | `algorithm4_asymmetric.py`/`algorithm4_asymmetric.sh`| V.D.1         |
-| 5    | `algorithm5_http2_mux.go`                            | V.D.2         |
+| 5    | `algorithm5_http2_mux_fixed.go` recommended; `algorithm5_http2_mux.go` kept for comparison | V.D.2 |
 
 All scripts implement **X-API-KEY rotation** (cycling between keys that
 match the gateway's three buckets — `AX001*`, `BX001*`, other — to bypass
 the per-key rate limit, mirroring Section VI.B).
+
+### Algorithm 5 implementation note
+
+Use `attacks/algorithm5_http2_mux_fixed.go` for new HTTP/2 multiplexing runs.
+It is a standalone Go entrypoint with `//go:build ignore`, so it does not
+conflict with the original `main` package during `go test ./...`, but it is
+directly runnable with `go run algorithm5_http2_mux_fixed.go`.
+
+The fixed version preserves the same CLI shape as the original and adds:
+
+- per-request random generators, avoiding concurrent `math/rand.Rand` races;
+- `StrictMaxConcurrentStreams: true`, so each worker stays on one HTTP/2
+  connection instead of silently opening extras when peer stream limits apply;
+- validation for invalid `-clients`, `-requests`, and `-streams` values;
+- signal-aware cancellation;
+- safer URL parsing and joining.
 
 ## Validating success
 

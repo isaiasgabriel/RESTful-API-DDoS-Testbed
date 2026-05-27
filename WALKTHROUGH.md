@@ -530,11 +530,11 @@ bash attacks/algorithm4_asymmetric.sh results/targets.json 100 3
   scales as `clients × streams`.
 - The paper proves this at Table VII: HTTP/2 + 15 clients = 95 % CPU.
 
-**Run**:
+**Run the fixed implementation**:
 
 ```bash
 cd attacks/
-go run algorithm5_http2_mux.go \
+go run algorithm5_http2_mux_fixed.go \
     -target       https://localhost:8443 \
     -targets-file ../results/targets.json \
     -clients  5 \
@@ -547,15 +547,22 @@ cd ..
 **Expected output** (real numbers):
 
 ```
-[+] HTTP/2 multiplexed attack | base=https://localhost:8443 | clients=5 | reqs/c=500 | streams/c=200 | symmetric=true
-[+] done in 2.372s | total=2500 | ~1053.8 rps | csv=../results/h2mux_*.csv
+[+] HTTP/2 multiplexed attack fixed | base=https://localhost:8443 | clients=5 | reqs/c=500 | streams/c=200 | symmetric=true
+[+] done in 2.372s | total=2500 | ~1053.8 rps | csv=../results/h2mux_fixed_*.csv
 ```
 
-**Where the log lands**: every run drops a new CSV in `lab/results/h2mux_<timestamp>.csv`
+**Where the log lands**: every run drops a new CSV in `lab/results/h2mux_fixed_<timestamp>.csv`
 (same folder as the Python / CURL attacks).  The Go binary automatically
 detects whether you launched it from `attacks/` or from the lab root and
 picks the right folder.  Override with `-out path/to/file.csv` or
 `LAB_RESULTS=/some/dir go run ...`.
+
+`algorithm5_http2_mux.go` is still present as the original implementation.
+Prefer `algorithm5_http2_mux_fixed.go` for new runs: it removes the shared
+`math/rand.Rand` race between stream goroutines, keeps each worker pinned to
+one HTTP/2 connection with `StrictMaxConcurrentStreams`, validates numeric
+flags, handles Ctrl-C through context cancellation, and normalizes target
+URLs before issuing requests.
 
 **Inspect the log**:
 
@@ -563,7 +570,7 @@ picks the right folder.  Override with `-out path/to/file.csv` or
 python3 << 'PY'
 import csv, glob
 from collections import Counter
-latest = max(glob.glob('results/h2mux_*.csv'))
+latest = max(glob.glob('results/h2mux_fixed_*.csv'))
 rows = list(csv.DictReader(open(latest)))
 print(f"file: {latest}  rows: {len(rows)}")
 print('statuses :', dict(Counter(r['status'] for r in rows).most_common()))
@@ -630,8 +637,8 @@ different `--clients` × `--requests` settings:
 | III   | `algorithm3_symmetric.sh _ N 1`                      |
 | IV    | `algorithm3_symmetric.sh _ N 5`                      |
 | V     | `algorithm3_symmetric.sh _ N 15`                     |
-| VI    | `algorithm5_http2_mux.go  -clients 1  -requests N`  |
-| VII   | `algorithm5_http2_mux.go  -clients 5|15 -requests N` |
+| VI    | `algorithm5_http2_mux_fixed.go  -clients 1  -requests N`  |
+| VII   | `algorithm5_http2_mux_fixed.go  -clients 5|15 -requests N` |
 | VIII  | `algorithm4_asymmetric.sh _ N 1`                     |
 | IX    | `algorithm4_asymmetric.sh _ N 15` + Algo 5 15 N      |
 
