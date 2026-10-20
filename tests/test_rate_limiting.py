@@ -29,7 +29,7 @@ def _send_requests(count: int, path: str = "/") -> tuple[list[int], list[float],
 def test_under_limit(record_latencies) -> None:
     statuses, latencies_ms, _ = _send_requests(90, "/")
     record_latencies(latencies_ms)
-    assert all(code != 429 for code in statuses)
+    assert all(code == 200 for code in statuses), statuses
 
 
 def test_over_limit(record_latencies) -> None:
@@ -56,7 +56,7 @@ def test_limit_resets(record_latencies) -> None:
 
     reset_statuses, reset_latencies_ms, _ = _send_requests(10, "/")
     record_latencies(reset_latencies_ms)
-    assert all(code != 429 for code in reset_statuses)
+    assert all(code == 200 for code in reset_statuses), reset_statuses
 
 
 def test_health_endpoint(record_latencies) -> None:

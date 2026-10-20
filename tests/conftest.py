@@ -27,9 +27,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--gateway",
         action="store",
         default="nginx",
-        choices=["kong", "nginx"],
+        choices=["kong", "nginx", "envoy"],
         help="Gateway plug-in under test.",
     )
+
+    parser.addoption("--reuse-stack", action="store_true",
+                     help="Test the running stack without starting or removing containers.")
+    parser.addoption("--report-dir", default=str(RESULTS_DIR),
+                     help="Directory for this execution's reports.")
 
 
 def _compose_base_cmd(gateway: str) -> list[str]:
@@ -65,7 +70,12 @@ def gateway_name(pytestconfig: pytest.Config) -> str:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def stack_lifecycle(gateway_name: str) -> None:
+def stack_lifecycle(gateway_name: str, pytestconfig: pytest.Config) -> None:
+    if pytestconfig.getoption("--reuse-stack"):
+        _wait_for_health()
+        yield
+        return
+
     env = os.environ.copy()
     env["API_GATEWAY"] = gateway_name
 
@@ -110,8 +120,13 @@ def _percentile(values: list[float], percentile: float) -> float | None:
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    # Listing tests must not overwrite evidence from a real execution.
+    if session.config.option.collectonly:
+        return
+
     gateway = str(session.config.getoption("--gateway"))
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    report_dir = Path(session.config.getoption("--report-dir"))
+    report_dir.mkdir(parents=True, exist_ok=True)
 
     missing = [name for name in TEST_CASES if name not in OUTCOME_BY_TEST]
     if missing:
@@ -132,7 +147,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
             }
         )
 
-    report_path = RESULTS_DIR / f"{gateway}_report.json"
+    report_path = report_dir / f"{gateway}_report.json"
     all_passed = all(OUTCOME_BY_TEST.get(t) == "passed" for t in TEST_CASES)
     report_payload = {
         "gateway": gateway,
