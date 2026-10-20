@@ -1,3 +1,5 @@
+> [Central de documentação e roteiro de estudos](../../docs/README.md). Para entender as duas trilhas e as divergências entre descrições antigas e configuração, consulte o mapa da aplicação na central.
+
 <!-- Role: Usage notes for the Kong gateway plug-in. -->
 # Kong gateway plug-in
 
