@@ -1,3 +1,9 @@
+> **Separação do experimento original:** os caminhos `algorithms/`, `attacks/`, `setup/`, `monitoring/` e `results/` desta trilha agora partem de `lab/original_experiment/`. As seções sobre gateways e testes de contrato continuam partindo de `lab/`. Consulte o [README desta trilha](../README.md).
+
+> [Índice de estudos](../../docs/README.md). Documento reorganizado em 20/10/2026; datas e resultados abaixo preservam o registro original. Caminhos em comandos continuam relativos ao diretório indicado no texto, não a esta pasta.
+
+> Material de referência histórica. Para a arquitetura e as limitações conhecidas, comece pelo [mapa da aplicação](../../docs/study/APPLICATION_MAP.md). Afirmações antigas de equivalência, bypass ou saturação não substituem a medição experimental.
+
 # Monitoring & Validation Guide
 
 To prove that the algorithms actually exhaust the target — i.e. to reproduce

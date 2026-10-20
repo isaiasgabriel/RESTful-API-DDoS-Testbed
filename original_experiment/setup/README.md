@@ -1,3 +1,5 @@
+> [Central de documentação e roteiro de estudos](../../docs/README.md). Para entender as duas trilhas e as divergências entre descrições antigas e configuração, consulte o mapa da aplicação na central.
+
 # Lab Target Setup
 
 This brings up the **complete** target environment from Section VI.B of the

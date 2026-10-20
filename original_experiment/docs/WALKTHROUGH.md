@@ -1,3 +1,9 @@
+> **Separação do experimento original:** os caminhos `algorithms/`, `attacks/`, `setup/`, `monitoring/` e `results/` desta trilha agora partem de `lab/original_experiment/`. As seções sobre gateways e testes de contrato continuam partindo de `lab/`. Consulte o [README desta trilha](../README.md).
+
+> [Índice de estudos](../../docs/README.md). Documento reorganizado em 20/10/2026; datas e resultados abaixo preservam o registro original. Caminhos em comandos continuam relativos ao diretório indicado no texto, não a esta pasta.
+
+> Material de referência histórica. Para a arquitetura e as limitações conhecidas, comece pelo [mapa da aplicação](../../docs/study/APPLICATION_MAP.md). Afirmações antigas de equivalência, bypass ou saturação não substituem a medição experimental.
+
 # Hands-on Walkthrough — Reproducing the Paper
 
 This is the step-by-step tutorial for the lab.  Follow it top-to-bottom and
@@ -61,7 +67,7 @@ gateway with three rate-limit dimensions (`X-API-KEY`, client IP,
 target **this** environment.
 
 ```bash
-cd lab/setup
+cd lab/original_experiment/setup
 docker compose up -d --build         # ~3 min cold start
 docker compose ps                    # should list 14 containers, all "Up"
 ```
@@ -106,7 +112,7 @@ This section covers the **second** lab stack: Sock Shop behind a swappable
 API gateway (Kong or NGINX) with a **single global limit** of 100 requests
 per minute per client IP.  It is **not** the paper's multi-bucket gateway;
 it exists so you can compare gateway implementations and prove they all
-honour the same [plug-in contract](README.md#two-ways-to-start-the-lab)
+honour the same [plug-in contract](LEGACY_TECHNICAL_README.md#two-ways-to-start-the-lab)
 without changing Sock Shop service code.
 
 ### 2.1 What you are testing
@@ -144,7 +150,7 @@ You also need Docker with permission to pull `nginx:1.27.0-alpine`,
 stacks use ports 8080 and 8443:
 
 ```bash
-cd lab/setup
+cd lab/original_experiment/setup
 docker compose down -v
 ```
 
@@ -325,7 +331,7 @@ sources (so we catch routes that aren't documented).
 **Run**:
 
 ```bash
-cd lab
+cd lab/original_experiment
 python3 algorithms/algorithm1_discover.py \
     --oas         http://localhost:8080/v3/api-docs \
     --client-root http://localhost:8080/ \
@@ -551,7 +557,7 @@ cd ..
 [+] done in 2.372s | total=2500 | ~1053.8 rps | csv=../results/h2mux_fixed_*.csv
 ```
 
-**Where the log lands**: every run drops a new CSV in `lab/results/h2mux_fixed_<timestamp>.csv`
+**Where the log lands**: every run drops a new CSV in `lab/original_experiment/results/h2mux_fixed_<timestamp>.csv`
 (same folder as the Python / CURL attacks).  The Go binary automatically
 detects whether you launched it from `attacks/` or from the lab root and
 picks the right folder.  Override with `-out path/to/file.csv` or
@@ -664,7 +670,7 @@ This is what produces the full reproduction at paper scale.
 pkill -f algorithm  ||  true
 
 # paper lab (Section 1):
-cd lab/setup
+cd lab/original_experiment/setup
 docker compose down -v
 
 # gateway plug-in stack (Section 2), if still running:

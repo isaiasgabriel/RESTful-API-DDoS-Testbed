@@ -1,3 +1,9 @@
+> **Separação do experimento original:** os caminhos `algorithms/`, `attacks/`, `setup/`, `monitoring/` e `results/` desta trilha agora partem de `lab/original_experiment/`. As seções sobre gateways e testes de contrato continuam partindo de `lab/`. Consulte o [README desta trilha](../README.md).
+
+> [Índice de estudos](../../docs/README.md). Documento reorganizado em 20/10/2026; datas e resultados abaixo preservam o registro original. Caminhos em comandos continuam relativos ao diretório indicado no texto, não a esta pasta.
+
+> Material de referência histórica. Para a arquitetura e as limitações conhecidas, comece pelo [mapa da aplicação](../../docs/study/APPLICATION_MAP.md). Afirmações antigas de equivalência, bypass ou saturação não substituem a medição experimental.
+
 # Algorithm 5 — HTTP/2 Multiplexed Attack, Explained
 
 Companion documentation for `algorithm5_http2_mux.go`.
@@ -52,7 +58,7 @@ Each "client" in `-clients N` is one Go worker that:
 
 ### 2.1. Opens exactly **one** HTTP/2 connection per worker
 
-```113:129:/home/user/Desktop/ddos/lab/attacks/algorithm5_http2_mux.go
+```113:129:/home/user/Desktop/ddos/lab/original_experiment/attacks/algorithm5_http2_mux.go
 func newH2Client(insecure bool, maxStreams int) *http.Client {
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: insecure,
@@ -79,7 +85,7 @@ negotiate the HTTP/2 protocol during the TLS handshake.
 
 ### 2.2. Picks a target endpoint
 
-```131:149:/home/user/Desktop/ddos/lab/attacks/algorithm5_http2_mux.go
+```131:149:/home/user/Desktop/ddos/lab/original_experiment/attacks/algorithm5_http2_mux.go
 func pickTarget(rng *rand.Rand, doc targetsDoc, symmetric bool,
 	staticTarget targetEntry) targetEntry {
 	if staticTarget.Path != "" {
@@ -109,7 +115,7 @@ func pickTarget(rng *rand.Rand, doc targetsDoc, symmetric bool,
 
 ### 2.3. Builds a request with rotated identity headers
 
-```207:215:/home/user/Desktop/ddos/lab/attacks/algorithm5_http2_mux.go
+```207:215:/home/user/Desktop/ddos/lab/original_experiment/attacks/algorithm5_http2_mux.go
 			req.Header.Set("X-API-KEY", randAPIKey(rng))
 			req.Header.Set("X-Forwarded-For", randXFF(rng))
 			req.Header.Set("X-User-Id", "u-"+randString(rng, 6))
@@ -129,7 +135,7 @@ to a **different "user"** and never trips its 100-/70-/50-req/min buckets.
 The API-key generator deliberately rotates **between all three bucket
 prefixes** the gateway recognises:
 
-```85:87:/home/user/Desktop/ddos/lab/attacks/algorithm5_http2_mux.go
+```85:87:/home/user/Desktop/ddos/lab/original_experiment/attacks/algorithm5_http2_mux.go
 func randAPIKey(rng *rand.Rand) string {
 	return apiKeyPrefixes[rng.Intn(len(apiKeyPrefixes))] + randString(rng, 8)
 }
@@ -140,7 +146,7 @@ matching the gateway's policy in `setup/gateway/ratelimit.lua`.
 
 ### 2.4. Fires up to `-streams S` requests in parallel, gated by a semaphore
 
-```167:183:/home/user/Desktop/ddos/lab/attacks/algorithm5_http2_mux.go
+```167:183:/home/user/Desktop/ddos/lab/original_experiment/attacks/algorithm5_http2_mux.go
 	// Stream-level concurrency: a buffered semaphore caps in-flight
 	// streams per client at `streams`, matching the paper's "Send Multiple
 	// Requests as chunks and send as different streams" (Algorithm 5, l. 5).
@@ -258,7 +264,7 @@ This is the *strongest* attack in the paper because it bypasses **both**:
 ## 6. Running it
 
 ```bash
-cd lab/attacks
+cd lab/original_experiment/attacks
 go run algorithm5_http2_mux.go \
     -target       https://localhost:8443 \
     -targets-file ../results/targets.json \
@@ -285,7 +291,7 @@ Flags:
 
 ## 7. Output
 
-Each invocation produces one timestamped CSV in `lab/results/`:
+Each invocation produces one timestamped CSV in `lab/original_experiment/results/`:
 
 ```
 worker,iteration,epoch,method,path,status,latency_ms,error

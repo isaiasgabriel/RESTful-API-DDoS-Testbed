@@ -2,3 +2,7 @@ results/*
 tests/results/*
 .venv/
 tests/__pycache__/
+original_experiment/results/*
+!original_experiment/results/endpoints.json
+!original_experiment/results/targets.json
+original_experiment/.venv/
